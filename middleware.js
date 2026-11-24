@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 const COOKIE = 'sambhal_session';
 
 async function valid(token) {
-  const secret = process.env.SESSION_SECRET || '';
+  const pw = (process.env.ADMIN_PASSWORD || '').trim().replace(/^["']|["']$/g, '');
+  const secret = process.env.SESSION_SECRET || (pw ? 'sambhal-session:' + pw : '');
   if (!token || !secret) return false;
   const [exp, sig] = token.split('.');
   if (!exp || !sig || Number(exp) < Date.now()) return false;
