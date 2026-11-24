@@ -1,0 +1,168 @@
+{
+  "name": "Sambhal - Visit reminders",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "84e7a71b-bdc1-4637-9d76-26c38a6c506b",
+      "name": "Every 5 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT v.id, v.wa_id, v.listing_title, v.slot_label, w.phone_number_id, w.access_token AS token\nFROM visits v\nJOIN account_wa w ON w.account_id = v.account_id\nJOIN accounts a ON a.id = v.account_id AND a.stage IN ('onboarding','live')\nWHERE v.status = 'booked' AND NOT v.reminder_sent\n  AND v.slot_at BETWEEN now() + interval '50 minutes' AND now() + interval '70 minutes';",
+        "options": {}
+      },
+      "id": "52ccb4aa-d682-4fcb-9f11-1782479884d8",
+      "name": "Visits due",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_ME",
+          "name": "Sambhal Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Business-initiated message more than 24 hours after the buyer last wrote: must be an approved template.\nreturn $input.all().map(i => {\n  const v = i.json;\n  return { json: { id: v.id, phone_number_id: v.phone_number_id, token: v.token, payload: {\n    messaging_product: 'whatsapp', to: v.wa_id, type: 'template',\n    template: { name: 'visit_reminder', language: { code: 'en' },\n      components: [{ type: 'body', parameters: [{ type: 'text', text: v.listing_title }, { type: 'text', text: v.slot_label }] }] }\n  } } };\n});\n"
+      },
+      "id": "abfa58f0-4eeb-40b7-bc76-493fae94db08",
+      "name": "Build reminder",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v21.0/{{ $json.phone_number_id }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {}
+      },
+      "id": "62c8ac65-ce32-406a-9c65-098e3f61b614",
+      "name": "Send reminder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH u AS (UPDATE visits SET reminder_sent = true WHERE id = $1::uuid RETURNING account_id)\nINSERT INTO events (account_id, job_key, event, msgs, est_cost)\nSELECT account_id, 'property', 'Reminder: visit in 1 hour', 1, 0.35 FROM u;",
+        "options": {
+          "queryReplacement": "={{ [$('Build reminder').item.json.id] }}"
+        }
+      },
+      "id": "c3356360-c346-4187-a859-7a2a46da1483",
+      "name": "Mark sent",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        880,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_ME",
+          "name": "Sambhal Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 5 minutes": {
+      "main": [
+        [
+          {
+            "node": "Visits due",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Visits due": {
+      "main": [
+        [
+          {
+            "node": "Build reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build reminder": {
+      "main": [
+        [
+          {
+            "node": "Send reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send reminder": {
+      "main": [
+        [
+          {
+            "node": "Mark sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

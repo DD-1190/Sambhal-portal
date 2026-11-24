@@ -1,0 +1,58 @@
+{
+  "name": "Sambhal - Error logger",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "4d2ac2ce-fc73-4e0c-8928-d6af82e0c6c6",
+      "name": "Error trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO system_errors (workflow, node, message, execution_url) VALUES ($1, $2, $3, $4);",
+        "options": {
+          "queryReplacement": "={{ [$json.workflow.name, $json.execution.lastNodeExecuted, $json.execution.error.message, $json.execution.url] }}"
+        }
+      },
+      "id": "72b0c0fb-58d9-4c7c-8b53-1b59882781bf",
+      "name": "Log error",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_ME",
+          "name": "Sambhal Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Error trigger": {
+      "main": [
+        [
+          {
+            "node": "Log error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

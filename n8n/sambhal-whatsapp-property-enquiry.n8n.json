@@ -1,0 +1,568 @@
+{
+  "name": "Sambhal - WhatsApp property enquiry",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "sambhal-wa",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "dcb00efd-ff3c-4392-ad6e-a2e59c73a249",
+      "name": "Verify webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "67ae175a-6794-4712-8983-11ebb2650ce6"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Meta calls this once when you register the webhook. Change the token, then use the same token in Meta.\nconst VERIFY_TOKEN = 'CHANGE_ME_VERIFY_TOKEN';\nconst q = $input.first().json.query || {};\nreturn [{ json: {\n  ok: q['hub.mode'] === 'subscribe' && q['hub.verify_token'] === VERIFY_TOKEN,\n  challenge: q['hub.challenge'] || ''\n} }];\n"
+      },
+      "id": "a080aa28-19e7-4fe8-8f99-809da2eeef41",
+      "name": "Check token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e8e4b415-c8af-4a88-9bdb-71979c4a824b",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "6b238053-6b02-4ff8-bc99-1aa8004c57e5",
+      "name": "Token ok?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.challenge }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "0ba0b475-84ca-464f-ad1b-7f546568e552",
+      "name": "Reply challenge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Forbidden",
+        "options": {
+          "responseCode": 403
+        }
+      },
+      "id": "c3c50178-88ec-41c5-9b47-b05a57727bd8",
+      "name": "Reply 403",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sambhal-wa",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "2ab9c735-caba-48ed-b04e-571426627646",
+      "name": "Inbound webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        400
+      ],
+      "webhookId": "be3f6078-130e-4dda-afd0-46df50e93e57"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Reads Meta's webhook payload and keeps only what the flow needs.\nconst body = $input.first().json.body || {};\nconst value = (((body.entry || [])[0] || {}).changes || [])[0]?.value || {};\nconst m = (value.messages || [])[0];\nif (!m) return [{ json: { has_message: false } }];   // delivery receipts and other status updates\nconst contact = (value.contacts || [])[0];\nlet kind = 'other', text = '', reply_id = '', reply_title = '';\nif (m.type === 'text') { kind = 'text'; text = (m.text && m.text.body) || ''; }\nelse if (m.type === 'interactive') {\n  kind = 'button';\n  const r = (m.interactive && (m.interactive.button_reply || m.interactive.list_reply)) || {};\n  reply_id = r.id || ''; reply_title = r.title || '';\n} else if (m.type === 'button') {\n  kind = 'button'; reply_id = (m.button && m.button.payload) || ''; reply_title = (m.button && m.button.text) || '';\n}\nreturn [{ json: {\n  has_message: true,\n  phone_number_id: value.metadata && value.metadata.phone_number_id,\n  wa_id: m.from, name: (contact && contact.profile && contact.profile.name) || '',\n  msg_id: m.id, kind, text, reply_id, reply_title\n} }];\n"
+      },
+      "id": "351907a5-3906-48e9-bb7b-7834eef34980",
+      "name": "Parse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e4b2ee63-ae03-4dfd-90af-6f97908bb770",
+              "leftValue": "={{ $json.has_message }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "400e1812-56a7-4847-9ea6-40bcf690863e",
+      "name": "Has message?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT get_context($1, $2) AS ctx;",
+        "options": {
+          "queryReplacement": "={{ [$json.phone_number_id, $json.wa_id] }}"
+        }
+      },
+      "id": "24092b8e-055f-4bfa-86d5-280087abb080",
+      "name": "Get context",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        660,
+        400
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_ME",
+          "name": "Sambhal Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Conversation logic for the Sambhal property enquiry flow.\n// Pure functions: no network, no database. Pasted into n8n Code nodes and unit-tested locally.\n\nvar DEFAULTS = {\n  kinds: [\n    { id: 'flat', title: 'Flat kharidna hai' },\n    { id: 'plot', title: 'Plot kharidna hai' },\n    { id: 'human', title: 'Dealer se baat' }\n  ],\n  budgets: [\n    { id: 'b1', title: '₹30–50 lakh', min: 30, max: 50 },\n    { id: 'b2', title: '₹50–80 lakh', min: 50, max: 80 },\n    { id: 'b3', title: '₹80 lakh se upar', min: 80, max: 99999 }\n  ],\n  areas: ['Indirapuram', 'Raj Nagar Extension', 'Vaishali'],\n  slots: [\n    { id: 's1', title: 'Kal 11:00 AM', dayOffset: 1, time: '11:00' },\n    { id: 's2', title: 'Kal 4:00 PM', dayOffset: 1, time: '16:00' },\n    { id: 's3', title: 'Parso 11:00 AM', dayOffset: 2, time: '11:00' }\n  ],\n  rates: { ai_call: 0.3, template: 0.35, session_message: 0 },\n  greeting: 'Namaste! Main {name} ka assistant hoon. Aap kya dhundh rahe hain?',\n  ai_model: 'claude-haiku-5-5'\n};\n\nfunction decide(ctx, msg, nowMs) {\n  var out = { skip: false, needsAI: false, replies: [], event: null, visit: null, step: null, data: null, aiBody: null, rates: null };\n  if (!ctx || !ctx.known || !ctx.enabled) { out.skip = true; return out; }\n  var cfg = Object.assign({}, DEFAULTS, ctx.config || {});\n  var rates = Object.assign({}, DEFAULTS.rates, cfg.rates || {});\n  out.rates = rates;\n  var conv = ctx.conversation;\n  if (conv && conv.last_msg_id === msg.msg_id) { out.skip = true; return out; }\n\n  var to = msg.wa_id;\n  var acct = ctx.account;\n  var step = conv ? conv.step : 'new';\n  var data = conv && conv.data ? JSON.parse(JSON.stringify(conv.data)) : {};\n  var isText = msg.kind === 'text';\n  var rid = msg.reply_id || '';\n  var label = '';\n  var meta = {};\n\n  function textMsg(body, dest) {\n    dest = dest || to;\n    return { to: dest, kind: 'session', payload: { messaging_product: 'whatsapp', to: dest, type: 'text', text: { body: body, preview_url: false } } };\n  }\n  function choose(body, opts) {\n    if (opts.length <= 3) {\n      return { to: to, kind: 'session', payload: { messaging_product: 'whatsapp', to: to, type: 'interactive', interactive: {\n        type: 'button', body: { text: body },\n        action: { buttons: opts.map(function (o) { return { type: 'reply', reply: { id: o.id, title: o.title.slice(0, 20) } }; }) } } } };\n    }\n    return { to: to, kind: 'session', payload: { messaging_product: 'whatsapp', to: to, type: 'interactive', interactive: {\n      type: 'list', body: { text: body },\n      action: { button: 'Chuniye', sections: [{ title: 'Options', rows: opts.slice(0, 10).map(function (o) { return { id: o.id, title: o.title.slice(0, 24) }; }) }] } } } };\n  }\n  function kindOpts() { return cfg.kinds.map(function (k) { return { id: 'kind:' + k.id, title: k.title }; }); }\n  function budgetOpts() { return cfg.budgets.map(function (b) { return { id: 'budget:' + b.id, title: b.title }; }); }\n  function areaOpts() { return cfg.areas.map(function (a) { return { id: 'area:' + a, title: a }; }); }\n  function slotOpts() { return cfg.slots.map(function (s) { return { id: 'slot:' + s.id, title: s.title }; }); }\n  function pickOpts() {\n    var m = data.matches || [];\n    if (m.length <= 1) return [{ id: 'pick:0', title: 'Dekhna hai' }];\n    return [{ id: 'pick:0', title: 'Pehla dekhna hai' }, { id: 'pick:1', title: 'Dusra dekhna hai' }];\n  }\n  function ask(s) {\n    if (s === 'kind') return choose('Aap kya dhundh rahe hain?', kindOpts());\n    if (s === 'budget') return choose('Aapka budget kitna hai?', budgetOpts());\n    if (s === 'area') return choose('Kis area mein dekh rahe hain?', areaOpts());\n    if (s === 'pick') return choose('Kaunsa option dekhna chahenge?', pickOpts());\n    if (s === 'slot') return choose('Site visit ke liye free slots:', slotOpts());\n    return null;\n  }\n  function dealerAlert(text) {\n    var d = ctx.wa && ctx.wa.dealer_phone;\n    if (!d) return;\n    if (cfg.dealer_template) {\n      out.replies.push({ to: d, kind: 'template', payload: { messaging_product: 'whatsapp', to: d, type: 'template', template: {\n        name: cfg.dealer_template, language: { code: 'en' },\n        components: [{ type: 'body', parameters: [{ type: 'text', text: text.replace(/\\s*\\n\\s*/g, ' | ') }] }] } } });\n    } else {\n      out.replies.push(textMsg(text, d));\n    }\n  }\n  function summary() {\n    var kind = (cfg.kinds.filter(function (k) { return k.id === data.kind; })[0] || {}).title || data.kind || '-';\n    var band = (cfg.budgets.filter(function (b) { return b.id === data.budget; })[0] || {}).title || '-';\n    return kind + ', ' + band + ', ' + (data.area || '-');\n  }\n  function matches() {\n    var band = cfg.budgets.filter(function (b) { return b.id === data.budget; })[0];\n    if (!band) return [];\n    return (ctx.listings || []).filter(function (l) {\n      return l.kind === data.kind && String(l.area).toLowerCase() === String(data.area || '').toLowerCase() &&\n        Number(l.price_lakh) >= band.min && Number(l.price_lakh) <= band.max;\n    }).slice(0, 2);\n  }\n  function slotAt(slot) {\n    var ist = new Date(nowMs + 19800000);\n    var d = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate() + (slot.dayOffset || 1)));\n    var mm = String(d.getUTCMonth() + 1).padStart(2, '0');\n    var dd = String(d.getUTCDate()).padStart(2, '0');\n    return d.getUTCFullYear() + '-' + mm + '-' + dd + 'T' + slot.time + ':00+05:30';\n  }\n  function unclear() {\n    // Free text mid-flow: let the AI answer, then repeat the current question.\n    if (isText && step !== 'done' && step !== 'handover' && !ctx.capped) {  // usage cap reached: no AI calls\n      out.needsAI = true;\n      var lst = (ctx.listings || []).map(function (l) { return { title: l.title, kind: l.kind, area: l.area, price_lakh: l.price_lakh, details: l.details }; });\n      out.aiBody = {\n        model: cfg.ai_model, max_tokens: 200,\n        system: 'You are the WhatsApp assistant of ' + acct.name + ', a property dealer in ' + acct.city + ', India. ' +\n          'Reply in Hinglish (Hindi in Roman script) in at most 2 short sentences. Use only facts from LISTINGS. ' +\n          'Never invent prices, availability or promises; if unsure, say the dealer will confirm. ' +\n          'Do not ask questions, the next question is sent separately. LISTINGS: ' + JSON.stringify(lst),\n        messages: [{ role: 'user', content: msg.text }]\n      };\n    }\n    var a = ask(step);\n    if (a) out.replies.push(a);\n    label = 'Unclear message, options repeated';\n  }\n\n  var greetRe = /^(hi+|hello|hey|namaste|start|menu)\\b/i;\n  var humanRe = /\\b(dealer|baat|call me|human|agent)\\b/i;\n\n  if (step === 'new' || (isText && greetRe.test(msg.text.trim()))) {\n    data = {}; step = 'kind';\n    out.replies.push(choose(cfg.greeting.replace('{name}', acct.name), kindOpts()));\n    label = 'New enquiry answered'; meta.first_reply = true;\n  } else if (rid === 'kind:human' || (isText && humanRe.test(msg.text))) {\n    step = 'handover';\n    out.replies.push(textMsg('Theek hai, dealer aapse jald hi sampark karenge.'));\n    dealerAlert('Buyer baat karna chahta hai.\\n' + (msg.name || 'Buyer') + ' (' + to + ')\\nAb tak: ' + summary());\n    label = 'Handed over to dealer';\n  } else if (step === 'kind') {\n    if (rid.indexOf('kind:') === 0) {\n      data.kind = rid.slice(5); step = 'budget';\n      out.replies.push(ask('budget')); label = 'Buyer intent captured';\n    } else unclear();\n  } else if (step === 'budget') {\n    if (rid.indexOf('budget:') === 0) {\n      data.budget = rid.slice(7); step = 'area';\n      out.replies.push(ask('area')); label = 'Budget captured';\n    } else unclear();\n  } else if (step === 'area') {\n    if (rid.indexOf('area:') === 0) {\n      data.area = rid.slice(5);\n      var m = matches();\n      if (!m.length) {\n        step = 'handover';\n        out.replies.push(textMsg('Is area aur budget mein abhi koi listing nahi hai. Dealer aapko naye options ke saath sampark karenge.'));\n        dealerAlert('Koi listing match nahi hui.\\n' + (msg.name || 'Buyer') + ' (' + to + ')\\nChahiye: ' + summary());\n        label = 'No listing matched, dealer alerted';\n      } else {\n        data.matches = m.map(function (l) { return { id: l.id, title: l.title }; });\n        step = 'pick';\n        out.replies.push(textMsg('Aapke liye ' + m.length + ' option' + (m.length > 1 ? 's' : '') + ' mile hain:\\n\\n' +\n          m.map(function (l, i) { return (i + 1) + '. ' + l.title + ' (' + l.area + ')\\n' + l.details + '\\n₹' + l.price_lakh + ' lakh'; }).join('\\n\\n')));\n        out.replies.push(ask('pick'));\n        label = m.length + ' listing' + (m.length > 1 ? 's' : '') + ' matched and sent';\n      }\n    } else unclear();\n  } else if (step === 'pick') {\n    if (rid.indexOf('pick:') === 0) {\n      data.pick = Number(rid.slice(5)); step = 'slot';\n      out.replies.push(ask('slot')); label = 'Visit slots offered';\n    } else unclear();\n  } else if (step === 'slot') {\n    var slot = rid.indexOf('slot:') === 0 ? cfg.slots.filter(function (s) { return 'slot:' + s.id === rid; })[0] : null;\n    if (slot) {\n      var chosen = (data.matches || [])[data.pick || 0] || { title: 'Property' };\n      data.slot = slot.id; step = 'done';\n      out.visit = { listing_title: chosen.title, slot_at: slotAt(slot), slot_label: slot.title };\n      out.replies.push(textMsg('Ho gaya. Visit confirm hai: ' + chosen.title + ', ' + slot.title + '. Visit se 1 ghante pehle reminder aayega, aur dealer ko aapka naam aur number bhej diya hai.'));\n      dealerAlert('Naya site visit.\\n' + (msg.name || 'Buyer') + ' (' + to + ')\\n' + chosen.title + ', ' + slot.title + '\\nChahiye: ' + summary());\n      label = 'Site visit booked, dealer alerted';\n    } else unclear();\n  } else {\n    // done or handover, and not a greeting\n    var booked = data.slot ? (cfg.slots.filter(function (s) { return s.id === data.slot; })[0] || {}).title : null;\n    out.replies.push(textMsg(booked\n      ? 'Aapka site visit (' + booked + ') booked hai. Kuch aur chahiye to \"dealer se baat\" likhiye, ya naye enquiry ke liye \"Hi\" likhiye.'\n      : 'Dealer jald aapse sampark karenge. Naye enquiry ke liye \"Hi\" likhiye.'));\n    label = 'Follow-up message acknowledged';\n  }\n\n  out.step = step; out.data = data;\n  out.event = { event: label, status: 'ok', meta: meta };\n  return out;\n}\n\n// Called after the optional AI call. Adds the AI answer and works out message count and estimated cost.\nfunction finalize(out, aiText) {\n  if (out.needsAI && aiText) {\n    out.replies.unshift({ to: out.replies[0] ? out.replies[0].to : null, kind: 'session',\n      payload: { messaging_product: 'whatsapp', to: out.replies[0].to, type: 'text', text: { body: aiText.trim(), preview_url: false } } });\n    out.event.event = 'Free-text question answered by AI';\n    out.event.ai_calls = 1;\n  } else {\n    out.event.ai_calls = 0;\n  }\n  var r = out.rates, cost = out.event.ai_calls * r.ai_call;\n  out.replies.forEach(function (x) { cost += x.kind === 'template' ? r.template : r.session_message; });\n  out.event.msgs = out.replies.length;\n  out.event.est_cost = Math.round(cost * 100) / 100;\n  return out;\n}\n\n\nconst ctx = $input.first().json.ctx;\nconst msg = $('Parse').first().json;\nreturn [{ json: decide(ctx, msg, Date.now()) }];\n"
+      },
+      "id": "c94e1b83-a94a-44c1-9907-65477955b738",
+      "name": "Decide",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8e365cd9-68da-485c-a6cf-e89094f9ce72",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0b321520-1f3f-4df0-92f2-4b4745edd452",
+      "name": "Skip?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        400
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "f34e22aa-feff-40f8-a792-b174f25aa324",
+      "name": "Stop",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ec9b5c16-a102-40f5-b38d-76a1ffcd813b",
+              "leftValue": "={{ $json.needsAI }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2226e4fb-753e-421f-aeb0-1e7084cb49e4",
+      "name": "Needs AI?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1320,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.aiBody) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "fdf7472a-b0b2-4df2-865a-0e70c8f918d6",
+      "name": "Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        420
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "Anthropic API key (header x-api-key)"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Conversation logic for the Sambhal property enquiry flow.\n// Pure functions: no network, no database. Pasted into n8n Code nodes and unit-tested locally.\n\nvar DEFAULTS = {\n  kinds: [\n    { id: 'flat', title: 'Flat kharidna hai' },\n    { id: 'plot', title: 'Plot kharidna hai' },\n    { id: 'human', title: 'Dealer se baat' }\n  ],\n  budgets: [\n    { id: 'b1', title: '₹30–50 lakh', min: 30, max: 50 },\n    { id: 'b2', title: '₹50–80 lakh', min: 50, max: 80 },\n    { id: 'b3', title: '₹80 lakh se upar', min: 80, max: 99999 }\n  ],\n  areas: ['Indirapuram', 'Raj Nagar Extension', 'Vaishali'],\n  slots: [\n    { id: 's1', title: 'Kal 11:00 AM', dayOffset: 1, time: '11:00' },\n    { id: 's2', title: 'Kal 4:00 PM', dayOffset: 1, time: '16:00' },\n    { id: 's3', title: 'Parso 11:00 AM', dayOffset: 2, time: '11:00' }\n  ],\n  rates: { ai_call: 0.3, template: 0.35, session_message: 0 },\n  greeting: 'Namaste! Main {name} ka assistant hoon. Aap kya dhundh rahe hain?',\n  ai_model: 'claude-haiku-5-5'\n};\n\nfunction decide(ctx, msg, nowMs) {\n  var out = { skip: false, needsAI: false, replies: [], event: null, visit: null, step: null, data: null, aiBody: null, rates: null };\n  if (!ctx || !ctx.known || !ctx.enabled) { out.skip = true; return out; }\n  var cfg = Object.assign({}, DEFAULTS, ctx.config || {});\n  var rates = Object.assign({}, DEFAULTS.rates, cfg.rates || {});\n  out.rates = rates;\n  var conv = ctx.conversation;\n  if (conv && conv.last_msg_id === msg.msg_id) { out.skip = true; return out; }\n\n  var to = msg.wa_id;\n  var acct = ctx.account;\n  var step = conv ? conv.step : 'new';\n  var data = conv && conv.data ? JSON.parse(JSON.stringify(conv.data)) : {};\n  var isText = msg.kind === 'text';\n  var rid = msg.reply_id || '';\n  var label = '';\n  var meta = {};\n\n  function textMsg(body, dest) {\n    dest = dest || to;\n    return { to: dest, kind: 'session', payload: { messaging_product: 'whatsapp', to: dest, type: 'text', text: { body: body, preview_url: false } } };\n  }\n  function choose(body, opts) {\n    if (opts.length <= 3) {\n      return { to: to, kind: 'session', payload: { messaging_product: 'whatsapp', to: to, type: 'interactive', interactive: {\n        type: 'button', body: { text: body },\n        action: { buttons: opts.map(function (o) { return { type: 'reply', reply: { id: o.id, title: o.title.slice(0, 20) } }; }) } } } };\n    }\n    return { to: to, kind: 'session', payload: { messaging_product: 'whatsapp', to: to, type: 'interactive', interactive: {\n      type: 'list', body: { text: body },\n      action: { button: 'Chuniye', sections: [{ title: 'Options', rows: opts.slice(0, 10).map(function (o) { return { id: o.id, title: o.title.slice(0, 24) }; }) }] } } } };\n  }\n  function kindOpts() { return cfg.kinds.map(function (k) { return { id: 'kind:' + k.id, title: k.title }; }); }\n  function budgetOpts() { return cfg.budgets.map(function (b) { return { id: 'budget:' + b.id, title: b.title }; }); }\n  function areaOpts() { return cfg.areas.map(function (a) { return { id: 'area:' + a, title: a }; }); }\n  function slotOpts() { return cfg.slots.map(function (s) { return { id: 'slot:' + s.id, title: s.title }; }); }\n  function pickOpts() {\n    var m = data.matches || [];\n    if (m.length <= 1) return [{ id: 'pick:0', title: 'Dekhna hai' }];\n    return [{ id: 'pick:0', title: 'Pehla dekhna hai' }, { id: 'pick:1', title: 'Dusra dekhna hai' }];\n  }\n  function ask(s) {\n    if (s === 'kind') return choose('Aap kya dhundh rahe hain?', kindOpts());\n    if (s === 'budget') return choose('Aapka budget kitna hai?', budgetOpts());\n    if (s === 'area') return choose('Kis area mein dekh rahe hain?', areaOpts());\n    if (s === 'pick') return choose('Kaunsa option dekhna chahenge?', pickOpts());\n    if (s === 'slot') return choose('Site visit ke liye free slots:', slotOpts());\n    return null;\n  }\n  function dealerAlert(text) {\n    var d = ctx.wa && ctx.wa.dealer_phone;\n    if (!d) return;\n    if (cfg.dealer_template) {\n      out.replies.push({ to: d, kind: 'template', payload: { messaging_product: 'whatsapp', to: d, type: 'template', template: {\n        name: cfg.dealer_template, language: { code: 'en' },\n        components: [{ type: 'body', parameters: [{ type: 'text', text: text.replace(/\\s*\\n\\s*/g, ' | ') }] }] } } });\n    } else {\n      out.replies.push(textMsg(text, d));\n    }\n  }\n  function summary() {\n    var kind = (cfg.kinds.filter(function (k) { return k.id === data.kind; })[0] || {}).title || data.kind || '-';\n    var band = (cfg.budgets.filter(function (b) { return b.id === data.budget; })[0] || {}).title || '-';\n    return kind + ', ' + band + ', ' + (data.area || '-');\n  }\n  function matches() {\n    var band = cfg.budgets.filter(function (b) { return b.id === data.budget; })[0];\n    if (!band) return [];\n    return (ctx.listings || []).filter(function (l) {\n      return l.kind === data.kind && String(l.area).toLowerCase() === String(data.area || '').toLowerCase() &&\n        Number(l.price_lakh) >= band.min && Number(l.price_lakh) <= band.max;\n    }).slice(0, 2);\n  }\n  function slotAt(slot) {\n    var ist = new Date(nowMs + 19800000);\n    var d = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate() + (slot.dayOffset || 1)));\n    var mm = String(d.getUTCMonth() + 1).padStart(2, '0');\n    var dd = String(d.getUTCDate()).padStart(2, '0');\n    return d.getUTCFullYear() + '-' + mm + '-' + dd + 'T' + slot.time + ':00+05:30';\n  }\n  function unclear() {\n    // Free text mid-flow: let the AI answer, then repeat the current question.\n    if (isText && step !== 'done' && step !== 'handover' && !ctx.capped) {  // usage cap reached: no AI calls\n      out.needsAI = true;\n      var lst = (ctx.listings || []).map(function (l) { return { title: l.title, kind: l.kind, area: l.area, price_lakh: l.price_lakh, details: l.details }; });\n      out.aiBody = {\n        model: cfg.ai_model, max_tokens: 200,\n        system: 'You are the WhatsApp assistant of ' + acct.name + ', a property dealer in ' + acct.city + ', India. ' +\n          'Reply in Hinglish (Hindi in Roman script) in at most 2 short sentences. Use only facts from LISTINGS. ' +\n          'Never invent prices, availability or promises; if unsure, say the dealer will confirm. ' +\n          'Do not ask questions, the next question is sent separately. LISTINGS: ' + JSON.stringify(lst),\n        messages: [{ role: 'user', content: msg.text }]\n      };\n    }\n    var a = ask(step);\n    if (a) out.replies.push(a);\n    label = 'Unclear message, options repeated';\n  }\n\n  var greetRe = /^(hi+|hello|hey|namaste|start|menu)\\b/i;\n  var humanRe = /\\b(dealer|baat|call me|human|agent)\\b/i;\n\n  if (step === 'new' || (isText && greetRe.test(msg.text.trim()))) {\n    data = {}; step = 'kind';\n    out.replies.push(choose(cfg.greeting.replace('{name}', acct.name), kindOpts()));\n    label = 'New enquiry answered'; meta.first_reply = true;\n  } else if (rid === 'kind:human' || (isText && humanRe.test(msg.text))) {\n    step = 'handover';\n    out.replies.push(textMsg('Theek hai, dealer aapse jald hi sampark karenge.'));\n    dealerAlert('Buyer baat karna chahta hai.\\n' + (msg.name || 'Buyer') + ' (' + to + ')\\nAb tak: ' + summary());\n    label = 'Handed over to dealer';\n  } else if (step === 'kind') {\n    if (rid.indexOf('kind:') === 0) {\n      data.kind = rid.slice(5); step = 'budget';\n      out.replies.push(ask('budget')); label = 'Buyer intent captured';\n    } else unclear();\n  } else if (step === 'budget') {\n    if (rid.indexOf('budget:') === 0) {\n      data.budget = rid.slice(7); step = 'area';\n      out.replies.push(ask('area')); label = 'Budget captured';\n    } else unclear();\n  } else if (step === 'area') {\n    if (rid.indexOf('area:') === 0) {\n      data.area = rid.slice(5);\n      var m = matches();\n      if (!m.length) {\n        step = 'handover';\n        out.replies.push(textMsg('Is area aur budget mein abhi koi listing nahi hai. Dealer aapko naye options ke saath sampark karenge.'));\n        dealerAlert('Koi listing match nahi hui.\\n' + (msg.name || 'Buyer') + ' (' + to + ')\\nChahiye: ' + summary());\n        label = 'No listing matched, dealer alerted';\n      } else {\n        data.matches = m.map(function (l) { return { id: l.id, title: l.title }; });\n        step = 'pick';\n        out.replies.push(textMsg('Aapke liye ' + m.length + ' option' + (m.length > 1 ? 's' : '') + ' mile hain:\\n\\n' +\n          m.map(function (l, i) { return (i + 1) + '. ' + l.title + ' (' + l.area + ')\\n' + l.details + '\\n₹' + l.price_lakh + ' lakh'; }).join('\\n\\n')));\n        out.replies.push(ask('pick'));\n        label = m.length + ' listing' + (m.length > 1 ? 's' : '') + ' matched and sent';\n      }\n    } else unclear();\n  } else if (step === 'pick') {\n    if (rid.indexOf('pick:') === 0) {\n      data.pick = Number(rid.slice(5)); step = 'slot';\n      out.replies.push(ask('slot')); label = 'Visit slots offered';\n    } else unclear();\n  } else if (step === 'slot') {\n    var slot = rid.indexOf('slot:') === 0 ? cfg.slots.filter(function (s) { return 'slot:' + s.id === rid; })[0] : null;\n    if (slot) {\n      var chosen = (data.matches || [])[data.pick || 0] || { title: 'Property' };\n      data.slot = slot.id; step = 'done';\n      out.visit = { listing_title: chosen.title, slot_at: slotAt(slot), slot_label: slot.title };\n      out.replies.push(textMsg('Ho gaya. Visit confirm hai: ' + chosen.title + ', ' + slot.title + '. Visit se 1 ghante pehle reminder aayega, aur dealer ko aapka naam aur number bhej diya hai.'));\n      dealerAlert('Naya site visit.\\n' + (msg.name || 'Buyer') + ' (' + to + ')\\n' + chosen.title + ', ' + slot.title + '\\nChahiye: ' + summary());\n      label = 'Site visit booked, dealer alerted';\n    } else unclear();\n  } else {\n    // done or handover, and not a greeting\n    var booked = data.slot ? (cfg.slots.filter(function (s) { return s.id === data.slot; })[0] || {}).title : null;\n    out.replies.push(textMsg(booked\n      ? 'Aapka site visit (' + booked + ') booked hai. Kuch aur chahiye to \"dealer se baat\" likhiye, ya naye enquiry ke liye \"Hi\" likhiye.'\n      : 'Dealer jald aapse sampark karenge. Naye enquiry ke liye \"Hi\" likhiye.'));\n    label = 'Follow-up message acknowledged';\n  }\n\n  out.step = step; out.data = data;\n  out.event = { event: label, status: 'ok', meta: meta };\n  return out;\n}\n\n// Called after the optional AI call. Adds the AI answer and works out message count and estimated cost.\nfunction finalize(out, aiText) {\n  if (out.needsAI && aiText) {\n    out.replies.unshift({ to: out.replies[0] ? out.replies[0].to : null, kind: 'session',\n      payload: { messaging_product: 'whatsapp', to: out.replies[0].to, type: 'text', text: { body: aiText.trim(), preview_url: false } } });\n    out.event.event = 'Free-text question answered by AI';\n    out.event.ai_calls = 1;\n  } else {\n    out.event.ai_calls = 0;\n  }\n  var r = out.rates, cost = out.event.ai_calls * r.ai_call;\n  out.replies.forEach(function (x) { cost += x.kind === 'template' ? r.template : r.session_message; });\n  out.event.msgs = out.replies.length;\n  out.event.est_cost = Math.round(cost * 100) / 100;\n  return out;\n}\n\n\nconst base = $('Decide').first().json;\nconst msg = $('Parse').first().json;\nconst ctx = $('Get context').first().json.ctx;\nlet aiText = null;\nif (base.needsAI) {\n  try { aiText = $('Claude').first().json.content[0].text; } catch (e) { aiText = null; }\n}\nconst fin = finalize(base, aiText);\nif (!fin.replies.length) fin.replies.push({ to: msg.wa_id, kind: 'session', payload: { messaging_product: 'whatsapp', to: msg.wa_id, type: 'text', text: { body: 'Dealer jald aapse sampark karenge.' } } });\nconst saveBody = {\n  account_id: ctx.account.id, wa_id: msg.wa_id, buyer_name: msg.name, msg_id: msg.msg_id,\n  step: fin.step, data: fin.data, events: [fin.event], visit: fin.visit\n};\nreturn fin.replies.map(r => ({ json: { phone_number_id: ctx.wa.phone_number_id, token: ctx.wa.token, payload: r.payload, saveBody } }));\n"
+      },
+      "id": "02361843-b6fd-47df-bb57-a584e6d2760c",
+      "name": "Build sends",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v21.0/{{ $json.phone_number_id }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {}
+      },
+      "id": "510bced7-2378-41d5-b01a-7f75f9ccae2c",
+      "name": "Send WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        500
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT save_turn($1::jsonb);",
+        "options": {
+          "queryReplacement": "={{ [JSON.stringify($('Build sends').first().json.saveBody)] }}"
+        }
+      },
+      "id": "16207ca7-4334-40dd-a143-e149cb4b0728",
+      "name": "Save turn",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2200,
+        500
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_ME",
+          "name": "Sambhal Postgres"
+        }
+      },
+      "executeOnce": true
+    }
+  ],
+  "connections": {
+    "Verify webhook": {
+      "main": [
+        [
+          {
+            "node": "Check token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check token": {
+      "main": [
+        [
+          {
+            "node": "Token ok?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Token ok?": {
+      "main": [
+        [
+          {
+            "node": "Reply challenge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply 403",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inbound webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse": {
+      "main": [
+        [
+          {
+            "node": "Has message?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has message?": {
+      "main": [
+        [
+          {
+            "node": "Get context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Get context": {
+      "main": [
+        [
+          {
+            "node": "Decide",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide": {
+      "main": [
+        [
+          {
+            "node": "Skip?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip?": {
+      "main": [
+        [
+          {
+            "node": "Stop",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Needs AI?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs AI?": {
+      "main": [
+        [
+          {
+            "node": "Claude",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build sends",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude": {
+      "main": [
+        [
+          {
+            "node": "Build sends",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build sends": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Save turn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

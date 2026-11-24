@@ -1,0 +1,187 @@
+{
+  "name": "Sambhal - Listing sync from Google Sheet",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "a335747f-ad51-4336-bc8d-4372087625de",
+      "name": "Every 30 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "5b66ca62-2796-4734-8561-ab82edc3cfa8",
+      "name": "Run now",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {},
+        "query": "SELECT s.account_id, s.sheet_id, s.tab FROM account_sheets s JOIN accounts a ON a.id = s.account_id WHERE a.stage IN ('onboarding','live');"
+      },
+      "id": "8acead46-9f8d-4075-a43a-9defa864d1f4",
+      "name": "Sheets to sync",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        80
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_ME",
+          "name": "Sambhal Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $json.sheet_id }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $json.tab }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "3213cf72-994e-498b-bbc4-45e0ec576661",
+      "name": "Read listings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        460,
+        80
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Groups the sheet rows by dealer, drops invalid rows, and never sends an empty list (a blank sheet changes nothing).\nconst dealers = $('Sheets to sync').all();\nconst groups = {};\nfor (const it of $input.all()) {\n  const idx = it.pairedItem && it.pairedItem.item !== undefined ? it.pairedItem.item : 0;\n  (groups[idx] = groups[idx] || []).push(it.json);\n}\nconst out = [];\nfor (const idx of Object.keys(groups)) {\n  const clean = []; let skipped = 0;\n  for (const r of groups[idx]) {\n    const kind = String(r.kind || '').trim().toLowerCase();\n    const price = Number(String(r.price_lakh || '').replace(/[^0-9.]/g, ''));\n    const id = String(r.id || '').trim(), title = String(r.title || '').trim(), area = String(r.area || '').trim();\n    const active = !/^(no|n|false|0)$/i.test(String(r.active === undefined ? 'yes' : r.active).trim());\n    if (!id || !title || !area || !price || ['flat', 'plot'].indexOf(kind) < 0) { skipped++; continue; }\n    clean.push({ external_id: id, kind, area, price_lakh: price, title, details: String(r.details || '').trim(), active });\n  }\n  if (clean.length) out.push({ json: { account_id: dealers[idx].json.account_id, rows: clean, skipped } });\n}\nreturn out;\n"
+      },
+      "id": "4228f76f-e2c1-4068-a258-d0cf93407e7a",
+      "name": "Clean rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT sync_listings($1::uuid, $2::jsonb) AS result;",
+        "options": {
+          "queryReplacement": "={{ [$json.account_id, JSON.stringify($json.rows)] }}"
+        }
+      },
+      "id": "8f7caf8a-173b-4c01-b352-9cbd2c9c9194",
+      "name": "Sync listings",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        900,
+        80
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_ME",
+          "name": "Sambhal Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 30 minutes": {
+      "main": [
+        [
+          {
+            "node": "Sheets to sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run now": {
+      "main": [
+        [
+          {
+            "node": "Sheets to sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheets to sync": {
+      "main": [
+        [
+          {
+            "node": "Read listings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read listings": {
+      "main": [
+        [
+          {
+            "node": "Clean rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean rows": {
+      "main": [
+        [
+          {
+            "node": "Sync listings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}
