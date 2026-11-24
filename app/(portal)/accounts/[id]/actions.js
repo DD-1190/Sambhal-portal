@@ -78,8 +78,8 @@ export async function saveSheet(fd) {
 export async function saveListing(fd) {
   const id = s(fd, 'id');
   await run(id, 'listings', () => q(
-    `insert into listings (account_id, kind, area, price_lakh, title, details) values ($1,$2,$3,$4,$5,$6)`,
-    [id, s(fd, 'kind'), s(fd, 'area'), Number(fd.get('price')), s(fd, 'title'), s(fd, 'details')]), 'Listing added.');
+    `insert into listings (account_id, kind, city, area, price_lakh, title, details) values ($1,$2,$3,$4,$5,$6,$7)`,
+    [id, s(fd, 'kind'), s(fd, 'city') || null, s(fd, 'area'), Number(fd.get('price')), s(fd, 'title'), s(fd, 'details')]), 'Listing added.');
 }
 export async function toggleListing(fd) {
   const id = s(fd, 'id');

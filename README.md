@@ -5,7 +5,7 @@ Your back office for every Sambhal client: pipeline, jobs per account, WhatsApp 
 ## Run it
 
 1. Create a Postgres database (Supabase is fine). In its SQL editor run, in order:
-   `db/01_schema.sql`, then `db/02_sync_and_alerts.sql`.
+   `db/01_schema.sql`, `db/02_sync_and_alerts.sql`, then `db/03_listing_city.sql`. Optional: `db/04_demo_north_india.sql` loads the North India demo into the demo account.
 2. Copy `.env.example` to `.env.local` and fill in:
    - `DATABASE_URL` – the Postgres connection string
    - `ADMIN_PASSWORD` – the password you will sign in with

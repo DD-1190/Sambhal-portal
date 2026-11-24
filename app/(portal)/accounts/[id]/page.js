@@ -106,7 +106,7 @@ export default async function Account({ params, searchParams }) {
 
   if (tab === 'listings') {
     const sh = await one(`select * from account_sheets where account_id=$1`, [id]);
-    const rows = await q(`select * from listings where account_id=$1 order by active desc, area, price_lakh`, [id]);
+    const rows = await q(`select * from listings where account_id=$1 order by active desc, city nulls first, area, price_lakh`, [id]);
     body = (
       <div className="stack">
         <section className="card"><h2>Google Sheet sync</h2>
@@ -122,6 +122,7 @@ export default async function Account({ params, searchParams }) {
           <form action={A.saveListing} className="inline" style={{ marginTop: 10 }}>
             <Hid id={id} />
             <label className="f">Type<select name="kind"><option value="flat">Flat</option><option value="plot">Plot</option></select></label>
+            <label className="f">City<input type="text" name="city" placeholder="Optional" /></label>
             <label className="f">Area<input type="text" name="area" required /></label>
             <label className="f">Price (lakh)<input type="number" name="price" min="0" step="0.1" required /></label>
             <label className="f">Title<input type="text" name="title" required placeholder="2 BHK, 1,050 sq ft" /></label>
@@ -130,15 +131,15 @@ export default async function Account({ params, searchParams }) {
           </form>
         </section>
         <div className="tablewrap"><table>
-          <thead><tr><th>Type</th><th>Area</th><th className="n">Lakh</th><th>Title</th><th>Details</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Type</th><th>City</th><th>Area</th><th className="n">Lakh</th><th>Title</th><th>Details</th><th>Status</th><th></th></tr></thead>
           <tbody>{rows.map((l) => (
-            <tr key={l.id}><td>{l.kind}</td><td>{l.area}</td><td className="n">{num(l.price_lakh)}</td><td>{l.title}</td><td>{l.details}</td>
+            <tr key={l.id}><td>{l.kind}</td><td>{l.city || '-'}</td><td>{l.area}</td><td className="n">{num(l.price_lakh)}</td><td>{l.title}</td><td>{l.details}</td>
               <td><span className={`pill ${l.active ? 'good' : ''}`}>{l.active ? 'Active' : 'Off'}</span></td>
               <td><div className="row">
                 <form action={A.toggleListing}><Hid id={id} /><input type="hidden" name="row" value={l.id} /><button className="btn sm">{l.active ? 'Switch off' : 'Switch on'}</button></form>
                 <form action={A.deleteListing}><Hid id={id} /><input type="hidden" name="row" value={l.id} /><button className="btn sm danger">Delete</button></form>
               </div></td></tr>))}
-            {rows.length === 0 && <tr><td colSpan="7" className="note">No listings yet.</td></tr>}</tbody>
+            {rows.length === 0 && <tr><td colSpan="8" className="note">No listings yet.</td></tr>}</tbody>
         </table></div>
       </div>
     );
